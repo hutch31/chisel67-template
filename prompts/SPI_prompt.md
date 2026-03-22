@@ -26,3 +26,8 @@ class SPIInterface(width : Int) extends Bundle {
 }
 ```
 
+## Code
+
+Create module called SpiSlave in package spi.
+
+
