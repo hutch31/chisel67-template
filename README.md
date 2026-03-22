@@ -1,40 +1,10 @@
 # chisel67-template
 
-## SPI Slave (Chisel)
+This is a basic template for a Chisel6.7 based project, with hooks for Chiseltest.  This project is intended as a
+bare starting point for experimenting with code generation with Copilot.
 
-This workspace now includes a SPI slave implementation in `src/main/scala/spi/SpiSlave.scala`.
+## IntelliJ Setup
 
-Implemented features:
-- Slave mode only
-- Mode 0 timing (`CPOL = 0`, `CPHA = 0`)
-- Lane width parameter `width = 1 | 2 | 4 | 8`
-- MSB-first and LSB-first transfer order (`io.lsbFirst`)
-- Oversampled internal clock assumption (`chisel clock >= 4x SPI clock`)
-
-### Module I/O
-
-`SpiSlave(width: Int)` exposes:
-- SPI pins via `io.spi` (`sclk`, `mosi`, `miso`, `cs`)
-- `io.txData`, `io.txValid`, `io.txReady` for one-byte TX buffering
-- `io.rxData`, `io.rxValid` for received byte output
-- `io.busy` and `io.misoEnable` status
-
-### Files
-
-- `src/main/scala/spi/SpiSlave.scala` - SPI interface bundle and module
-- `src/main/scala/spi/GenerateSpiSlave.scala` - Verilog generator app
-- `src/test/scala/spi/SpiSlaveSpec.scala` - chiseltest testbench
-
-### Quick start
-
-Run tests:
-
-```powershell
-sbt test
-```
-
-Generate Verilog:
-
-```powershell
-sbt "runMain spi.GenerateSpiSlave"
-```
+IntelliJ will need the Scala and Github Copilot plugins for this to work correctly.  It will also need a Java JDK in order to compile
+the Scala files.  firtool is not needed for any of the unit tests, as the Treadle (Scala-native) simulator is good enough for short 
+tests.
