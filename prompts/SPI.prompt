@@ -1,0 +1,28 @@
+# Create a SPI Implementation in Chisel
+
+## Overview
+
+Create a SPI (Serial Peripheral Interface) implementation in Chisel.
+The SPI protocol is a synchronous serial communication protocol used
+for short-distance communication, primarily in embedded systems.
+The implementation should include the following features:
+  - Slave mode only
+  - Parameterized width (1, 2, 4 or 8 bits)
+  - Mode 0 only (CPOL = 0, CPHA = 0)
+  - Support for both MSB and LSB first transmission
+
+The implemenation should use an oversampled clock to capture and drive data.
+The chisel clock can be assumed to be at least 4X the frequency of the SPI clock.
+
+## Interface
+
+The SPI implementation should have the following interface:
+```scala
+class SPIInterface(width : Int) extends Bundle {
+  val sclk = Input(Bool()) // SPI clock
+  val mosi = Input(UInt(width.W) // Master Out Slave In
+  val miso = Output(UInt(width.W) // Master In Slave Out
+  val cs = Input(Bool())   // Chip Select (active low)
+}
+```
+

@@ -1,0 +1,57 @@
+
+# Scala / SBT
+target/
+project/target/
+project/project/
+*.class
+*.tasty
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.cache
+
+# SBT specific
+.bsp/
+.metals/
+.bloop/
+metals.sbt
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+.cache-main
+.cache-tests
+
+# Ensime
+.ensime
+.ensime_cache/
+.ensime_lucene/
+
+# Vim
+*.swp
+*.swo
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
