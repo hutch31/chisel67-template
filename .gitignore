@@ -55,3 +55,4 @@ desktop.ini
 *.log
 logs/
 
+test_run_dir/
