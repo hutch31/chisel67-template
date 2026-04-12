@@ -10,11 +10,16 @@ object SpiHelper {
 
   /** Drive one full 8-bit word over SPI at the given width.
     *
+    * MISO is sampled immediately after sclk is asserted high (before any clock
+    * step), matching Mode-0 semantics where the slave pre-drives MISO from the
+    * previous falling edge and the master captures on the rising edge.
+    *
     * @param dut       the SpiSlave DUT
     * @param data      8-bit word to send (MOSI)
     * @param width     number of bits per SPI clock cycle
     * @param lsbFirst  true → send LSB first
-    * @param halfPeriod system-clock cycles per SPI half-period (must be ≥2)
+    * @param halfPeriod system-clock cycles per SPI half-period (must be ≥ 4 for
+    *                   the 3-stage synchronizer to detect edges reliably)
     * @return collected MISO bits assembled into an 8-bit word
     */
   def transferWord(
@@ -35,15 +40,15 @@ object SpiHelper {
         (data >> (8 - (cycle + 1) * width)) & ((1 << width) - 1)
       }
 
-      // Set MOSI and let it settle before the rising edge
+      // Set MOSI and step through the low half-period.
+      // The falling edge from the previous high period is detected here.
       dut.io.spi.mosi.poke(slice.U)
       dut.clock.step(halfPeriod)
 
-      // Rising edge: slave samples MOSI
+      // Rising edge: assert sclk and immediately capture MISO (combinatorial)
+      // before the slave's synchronizer has clocked in the new sclk state.
+      // This mirrors Mode-0 master behaviour: sample at the rising edge instant.
       dut.io.spi.sclk.poke(true.B)
-      dut.clock.step(halfPeriod)
-
-      // Capture MISO (driven after rising edge, stable during second half)
       val misoSlice = dut.io.spi.miso.peek().litValue.toInt
 
       if (lsbFirst) {
@@ -52,19 +57,22 @@ object SpiHelper {
         misoWord = (misoWord << width) | misoSlice
       }
 
-      // Falling edge: slave shifts out next MISO bit
+      // Step through the high half-period so the slave detects the rising edge.
+      dut.clock.step(halfPeriod)
+
+      // Falling edge: lower sclk (slave will shift TX on next low half-period)
       dut.io.spi.sclk.poke(false.B)
     }
     misoWord
   }
 
-  /** Assert chip-select (active low) */
+  /** Assert chip-select (active low) and wait for synchronizers to settle. */
   def csAssert(dut: SpiSlave): Unit = {
     dut.io.spi.cs.poke(false.B)
-    dut.clock.step(4) // allow synchronizers to propagate
+    dut.clock.step(4) // allow 2-FF synchronizer plus margin
   }
 
-  /** Deassert chip-select */
+  /** Deassert chip-select. */
   def csDeassert(dut: SpiSlave): Unit = {
     dut.io.spi.cs.poke(true.B)
     dut.clock.step(4)
@@ -81,20 +89,25 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
   it should "receive a byte MSB-first with width=1" in {
     test(new SpiSlave(1)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       dut.io.spi.sclk.poke(false.B)
-      dut.io.spi.cs.poke(true.B)   // deasserted
+      dut.io.spi.cs.poke(true.B)
       dut.io.lsbFirst.poke(false.B)
       dut.io.txData.valid.poke(false.B)
-      dut.io.rxData.ready.poke(true.B)
+      dut.io.rxData.ready.poke(false.B) // not consuming yet
       dut.clock.step(2)
 
       SpiHelper.csAssert(dut)
 
       val txByte = 0xA5
       SpiHelper.transferWord(dut, txByte, width = 1, lsbFirst = false)
-      dut.clock.step(4) // let rxValid propagate
+      dut.clock.step(4) // allow rxValid register to propagate
 
       dut.io.rxData.valid.expect(true.B)
       dut.io.rxData.bits.expect(txByte.U)
+
+      // Acknowledge
+      dut.io.rxData.ready.poke(true.B)
+      dut.clock.step(1)
+      dut.io.rxData.valid.expect(false.B)
 
       SpiHelper.csDeassert(dut)
     }
@@ -109,7 +122,7 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.spi.cs.poke(true.B)
       dut.io.lsbFirst.poke(true.B)
       dut.io.txData.valid.poke(false.B)
-      dut.io.rxData.ready.poke(true.B)
+      dut.io.rxData.ready.poke(false.B)
       dut.clock.step(2)
 
       SpiHelper.csAssert(dut)
@@ -120,6 +133,10 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.rxData.valid.expect(true.B)
       dut.io.rxData.bits.expect(txByte.U)
+
+      dut.io.rxData.ready.poke(true.B)
+      dut.clock.step(1)
+      dut.io.rxData.valid.expect(false.B)
 
       SpiHelper.csDeassert(dut)
     }
@@ -134,7 +151,7 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.spi.cs.poke(true.B)
       dut.io.lsbFirst.poke(false.B)
       dut.io.txData.valid.poke(false.B)
-      dut.io.rxData.ready.poke(true.B)
+      dut.io.rxData.ready.poke(false.B)
       dut.clock.step(2)
 
       SpiHelper.csAssert(dut)
@@ -145,6 +162,10 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.rxData.valid.expect(true.B)
       dut.io.rxData.bits.expect(txByte.U)
+
+      dut.io.rxData.ready.poke(true.B)
+      dut.clock.step(1)
+      dut.io.rxData.valid.expect(false.B)
 
       SpiHelper.csDeassert(dut)
     }
@@ -159,7 +180,7 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.spi.cs.poke(true.B)
       dut.io.lsbFirst.poke(false.B)
       dut.io.txData.valid.poke(false.B)
-      dut.io.rxData.ready.poke(true.B)
+      dut.io.rxData.ready.poke(false.B)
       dut.clock.step(2)
 
       SpiHelper.csAssert(dut)
@@ -167,14 +188,24 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
       val byte1 = 0xAB
       SpiHelper.transferWord(dut, byte1, width = 1, lsbFirst = false)
       dut.clock.step(4)
+
       dut.io.rxData.valid.expect(true.B)
       dut.io.rxData.bits.expect(byte1.U)
+      // Acknowledge first byte before second word completes
+      dut.io.rxData.ready.poke(true.B)
+      dut.clock.step(1)
+      dut.io.rxData.ready.poke(false.B)
 
       val byte2 = 0xCD
       SpiHelper.transferWord(dut, byte2, width = 1, lsbFirst = false)
       dut.clock.step(4)
+
       dut.io.rxData.valid.expect(true.B)
       dut.io.rxData.bits.expect(byte2.U)
+
+      dut.io.rxData.ready.poke(true.B)
+      dut.clock.step(1)
+      dut.io.rxData.valid.expect(false.B)
 
       SpiHelper.csDeassert(dut)
     }
@@ -198,6 +229,10 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
 
       SpiHelper.csAssert(dut)
 
+      // Deassert txData.valid after the word is loaded on csStart so the
+      // design does not reload txShift when the last RX word completes.
+      dut.io.txData.valid.poke(false.B)
+
       // Drive MOSI as 0 – we only care about MISO here
       val misoWord = SpiHelper.transferWord(dut, 0x00, width = 1, lsbFirst = false)
       dut.clock.step(2)
@@ -217,7 +252,7 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.spi.cs.poke(true.B)
       dut.io.lsbFirst.poke(false.B)
       dut.io.txData.valid.poke(false.B)
-      dut.io.rxData.ready.poke(true.B)
+      dut.io.rxData.ready.poke(false.B)
       dut.clock.step(2)
 
       // Start a transfer, send only 3 bits then deassert
@@ -239,10 +274,16 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
       val fullByte = 0xFF
       SpiHelper.transferWord(dut, fullByte, width = 1, lsbFirst = false)
       dut.clock.step(4)
+
       dut.io.rxData.valid.expect(true.B)
       dut.io.rxData.bits.expect(fullByte.U)
+
+      dut.io.rxData.ready.poke(true.B)
+      dut.clock.step(1)
+      dut.io.rxData.valid.expect(false.B)
 
       SpiHelper.csDeassert(dut)
     }
   }
 }
+

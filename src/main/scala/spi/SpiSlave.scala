@@ -77,9 +77,6 @@ class SpiSlave(width: Int = 1) extends Module {
   //   - a transfer starts (csStart), or
   //   - we have just finished shifting out the last bit of the current word
   //     and there is new data available
-  val txLoad = Wire(Bool())
-  txLoad := false.B
-
   io.txData.ready := false.B
 
   when (csStart) {
@@ -93,7 +90,6 @@ class SpiSlave(width: Int = 1) extends Module {
       txReady  := false.B
     }
     bitCnt := 0.U
-    txLoad := true.B
   }
 
   when (!csActive) {
