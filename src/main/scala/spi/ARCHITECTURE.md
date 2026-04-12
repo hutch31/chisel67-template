@@ -33,7 +33,8 @@ The implementation supports SPI Mode 0 (CPOL=0, CPHA=0), parameterized data widt
 
 4. **Shift register (receive)**: On each detected rising edge of `sclk` (while `cs` is
    low), the incoming `mosi` data is shifted into a receive shift register. When
-   `width` bits have been received, the word is presented on `rxData`.
+   `8/width` SPI clock cycles have elapsed (i.e., all 8 bits of a word have been
+   received), the word is presented on `rxData`.
 
 5. **Shift register (transmit)**: The `txData` word is loaded into a transmit shift
    register when `cs` goes low (start of transfer) or when the previous word is
@@ -56,7 +57,7 @@ The implementation supports SPI Mode 0 (CPOL=0, CPHA=0), parameterized data widt
 - On `sclkRise` and active `cs`:  shift `mosi` into the RX shift register.
 - On `sclkFall` and active `cs`: shift the TX shift register; drive `miso`.
 - Increment the bit counter on each bit clock edge.
-- When the bit counter reaches `width`, assert `rxData.valid` and load next TX word.
+- When the bit counter reaches `cyclesPerWord` (= `8/width`), assert `rxData.valid` and load next TX word.
 
 ## Interfaces
 

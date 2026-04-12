@@ -87,7 +87,7 @@ class SpiSlaveTest extends AnyFlatSpec with ChiselScalatestTester {
   // Feature 1: Basic RX – MSB-first, width=1
   // -----------------------------------------------------------------------
   it should "receive a byte MSB-first with width=1" in {
-    test(new SpiSlave(1)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+    test(new SpiSlave(1)) { dut =>
       dut.io.spi.sclk.poke(false.B)
       dut.io.spi.cs.poke(true.B)
       dut.io.lsbFirst.poke(false.B)
